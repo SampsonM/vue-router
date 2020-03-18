@@ -31,7 +31,7 @@ export class History {
   +ensureURL: (push?: boolean) => void
   +getCurrentLocation: () => string
 
-  constructor (router: Router, base: ?string) {
+  constructor (router: Router, base: ?string | RegExp) {
     this.router = router
     this.base = normalizeBase(base)
     // start with a route object that stands for "nowhere"
@@ -210,7 +210,7 @@ export class History {
   }
 }
 
-function normalizeBase (base: ?string): string {
+function normalizeBase (base: ?string | RegExp): string {
   if (!base) {
     if (inBrowser) {
       // respect <base> tag
@@ -222,12 +222,27 @@ function normalizeBase (base: ?string): string {
       base = '/'
     }
   }
-  // make sure there's the starting slash
-  if (base.charAt(0) !== '/') {
+
+  // for regex base
+  if (base && base instanceof RegExp) {
+    const path = decodeURI(window.location.pathname)
+    const pathMatch = path.match(base)
+
+    if (pathMatch && pathMatch.length > 0) {
+      base = pathMatch[0]
+      console.log('is regexp in normalizeBase', base)
+    }
+  }
+
+  if (typeof base === 'string' && base.charAt(0) !== '/') {
     base = '/' + base
   }
-  // remove trailing slash
-  return base.replace(/\/$/, '')
+
+  if (typeof base === 'string') {
+    return base.replace(/\/$/, '')
+  } else {
+    return ''
+  }
 }
 
 function resolveQueue (

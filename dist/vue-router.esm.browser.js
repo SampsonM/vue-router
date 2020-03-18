@@ -590,7 +590,7 @@ function parse (str, options) {
  * @return {!function(Object=, Object=)}
  */
 function compile (str, options) {
-  return tokensToFunction(parse(str, options))
+  return tokensToFunction(parse(str, options), options)
 }
 
 /**
@@ -620,14 +620,14 @@ function encodeAsterisk (str) {
 /**
  * Expose a method for transforming tokens into the path function.
  */
-function tokensToFunction (tokens) {
+function tokensToFunction (tokens, options) {
   // Compile all the tokens into regexps.
   var matches = new Array(tokens.length);
 
   // Compile all the patterns before compilation.
   for (var i = 0; i < tokens.length; i++) {
     if (typeof tokens[i] === 'object') {
-      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$');
+      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$', flags(options));
     }
   }
 
@@ -740,7 +740,7 @@ function attachKeys (re, keys) {
  * @return {string}
  */
 function flags (options) {
-  return options.sensitive ? '' : 'i'
+  return options && options.sensitive ? '' : 'i'
 }
 
 /**
@@ -2019,7 +2019,7 @@ class History {
   
   
 
-  constructor (router, base) {
+  constructor(router, base) {
     this.router = router;
     this.base = normalizeBase(base);
     // start with a route object that stands for "nowhere"
@@ -2031,11 +2031,11 @@ class History {
     this.errorCbs = [];
   }
 
-  listen (cb) {
+  listen(cb) {
     this.cb = cb;
   }
 
-  onReady (cb, errorCb) {
+  onReady(cb, errorCb) {
     if (this.ready) {
       cb();
     } else {
@@ -2046,11 +2046,11 @@ class History {
     }
   }
 
-  onError (errorCb) {
+  onError(errorCb) {
     this.errorCbs.push(errorCb);
   }
 
-  transitionTo (
+  transitionTo(
     location,
     onComplete,
     onAbort
@@ -2085,7 +2085,7 @@ class History {
     );
   }
 
-  confirmTransition (route, onComplete, onAbort) {
+  confirmTransition(route, onComplete, onAbort) {
     const current = this.current;
     const abort = err => {
       // after merging https://github.com/vuejs/vue-router/pull/2771 we
@@ -2188,7 +2188,7 @@ class History {
     });
   }
 
-  updateRoute (route) {
+  updateRoute(route) {
     const prev = this.current;
     this.current = route;
     this.cb && this.cb(route);
@@ -2198,7 +2198,7 @@ class History {
   }
 }
 
-function normalizeBase (base) {
+function normalizeBase(base) {
   if (!base) {
     if (inBrowser) {
       // respect <base> tag
@@ -2210,15 +2210,30 @@ function normalizeBase (base) {
       base = '/';
     }
   }
-  // make sure there's the starting slash
-  if (base.charAt(0) !== '/') {
+
+  // for regex base
+  if (base && base instanceof RegExp) {
+    const path = decodeURI(window.location.pathname);
+    const pathMatch = path.match(base);
+
+    if (pathMatch && pathMatch.length > 0) {
+      base = pathMatch[0];
+      console.log('is regexp in normalizeBase', base);
+    }
+  }
+  
+  if (typeof base === 'string' && base.charAt(0) !== '/') {
     base = '/' + base;
   }
-  // remove trailing slash
-  return base.replace(/\/$/, '')
+
+  if (typeof base === 'string') {
+    return base.replace(/\/$/, '')
+  } else {
+    return ''
+  }
 }
 
-function resolveQueue (
+function resolveQueue(
   current,
   next
 ) {
@@ -2236,7 +2251,7 @@ function resolveQueue (
   }
 }
 
-function extractGuards (
+function extractGuards(
   records,
   name,
   bind,
@@ -2253,7 +2268,7 @@ function extractGuards (
   return flatten(reverse ? guards.reverse() : guards)
 }
 
-function extractGuard (
+function extractGuard(
   def,
   key
 ) {
@@ -2264,23 +2279,23 @@ function extractGuard (
   return def.options[key]
 }
 
-function extractLeaveGuards (deactivated) {
+function extractLeaveGuards(deactivated) {
   return extractGuards(deactivated, 'beforeRouteLeave', bindGuard, true)
 }
 
-function extractUpdateHooks (updated) {
+function extractUpdateHooks(updated) {
   return extractGuards(updated, 'beforeRouteUpdate', bindGuard)
 }
 
-function bindGuard (guard, instance) {
+function bindGuard(guard, instance) {
   if (instance) {
-    return function boundRouteGuard () {
+    return function boundRouteGuard() {
       return guard.apply(instance, arguments)
     }
   }
 }
 
-function extractEnterGuards (
+function extractEnterGuards(
   activated,
   cbs,
   isValid
@@ -2294,14 +2309,14 @@ function extractEnterGuards (
   )
 }
 
-function bindEnterGuard (
+function bindEnterGuard(
   guard,
   match,
   key,
   cbs,
   isValid
 ) {
-  return function routeEnterGuard (to, from, next) {
+  return function routeEnterGuard(to, from, next) {
     return guard(to, from, cb => {
       if (typeof cb === 'function') {
         cbs.push(() => {
@@ -2318,7 +2333,7 @@ function bindEnterGuard (
   }
 }
 
-function poll (
+function poll(
   cb, // somehow flow cannot infer this is a function
   instances,
   key,
@@ -2352,6 +2367,7 @@ class HTML5History extends History {
     const initLocation = getLocation(this.base);
     window.addEventListener('popstate', e => {
       const current = this.current;
+      console.log(this.base);
 
       // Avoiding first `popstate` event dispatched in some browsers but first
       // history route not updated since async guard at the same time.
@@ -2403,7 +2419,9 @@ class HTML5History extends History {
 }
 
 function getLocation (base) {
+  console.log('getLocation',base);
   let path = decodeURI(window.location.pathname);
+
   if (base && path.indexOf(base) === 0) {
     path = path.slice(base.length);
   }

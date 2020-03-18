@@ -7,7 +7,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global = global || self, global.VueRouter = factory());
-}(this, function () { 'use strict';
+}(this, (function () { 'use strict';
 
   /*  */
 
@@ -610,7 +610,7 @@
    * @return {!function(Object=, Object=)}
    */
   function compile (str, options) {
-    return tokensToFunction(parse(str, options))
+    return tokensToFunction(parse(str, options), options)
   }
 
   /**
@@ -640,14 +640,14 @@
   /**
    * Expose a method for transforming tokens into the path function.
    */
-  function tokensToFunction (tokens) {
+  function tokensToFunction (tokens, options) {
     // Compile all the tokens into regexps.
     var matches = new Array(tokens.length);
 
     // Compile all the patterns before compilation.
     for (var i = 0; i < tokens.length; i++) {
       if (typeof tokens[i] === 'object') {
-        matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$');
+        matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$', flags(options));
       }
     }
 
@@ -760,7 +760,7 @@
    * @return {string}
    */
   function flags (options) {
-    return options.sensitive ? '' : 'i'
+    return options && options.sensitive ? '' : 'i'
   }
 
   /**
@@ -2036,7 +2036,7 @@
 
   /*  */
 
-  var History = function History (router, base) {
+  var History = function History(router, base) {
     this.router = router;
     this.base = normalizeBase(base);
     // start with a route object that stands for "nowhere"
@@ -2221,7 +2221,7 @@
     });
   };
 
-  function normalizeBase (base) {
+  function normalizeBase(base) {
     if (!base) {
       if (inBrowser) {
         // respect <base> tag
@@ -2233,15 +2233,30 @@
         base = '/';
       }
     }
-    // make sure there's the starting slash
-    if (base.charAt(0) !== '/') {
+
+    // for regex base
+    if (base && base instanceof RegExp) {
+      var path = decodeURI(window.location.pathname);
+      var pathMatch = path.match(base);
+
+      if (pathMatch && pathMatch.length > 0) {
+        base = pathMatch[0];
+        console.log('is regexp in normalizeBase', base);
+      }
+    }
+    
+    if (typeof base === 'string' && base.charAt(0) !== '/') {
       base = '/' + base;
     }
-    // remove trailing slash
-    return base.replace(/\/$/, '')
+
+    if (typeof base === 'string') {
+      return base.replace(/\/$/, '')
+    } else {
+      return ''
+    }
   }
 
-  function resolveQueue (
+  function resolveQueue(
     current,
     next
   ) {
@@ -2259,7 +2274,7 @@
     }
   }
 
-  function extractGuards (
+  function extractGuards(
     records,
     name,
     bind,
@@ -2276,7 +2291,7 @@
     return flatten(reverse ? guards.reverse() : guards)
   }
 
-  function extractGuard (
+  function extractGuard(
     def,
     key
   ) {
@@ -2287,23 +2302,23 @@
     return def.options[key]
   }
 
-  function extractLeaveGuards (deactivated) {
+  function extractLeaveGuards(deactivated) {
     return extractGuards(deactivated, 'beforeRouteLeave', bindGuard, true)
   }
 
-  function extractUpdateHooks (updated) {
+  function extractUpdateHooks(updated) {
     return extractGuards(updated, 'beforeRouteUpdate', bindGuard)
   }
 
-  function bindGuard (guard, instance) {
+  function bindGuard(guard, instance) {
     if (instance) {
-      return function boundRouteGuard () {
+      return function boundRouteGuard() {
         return guard.apply(instance, arguments)
       }
     }
   }
 
-  function extractEnterGuards (
+  function extractEnterGuards(
     activated,
     cbs,
     isValid
@@ -2317,14 +2332,14 @@
     )
   }
 
-  function bindEnterGuard (
+  function bindEnterGuard(
     guard,
     match,
     key,
     cbs,
     isValid
   ) {
-    return function routeEnterGuard (to, from, next) {
+    return function routeEnterGuard(to, from, next) {
       return guard(to, from, function (cb) {
         if (typeof cb === 'function') {
           cbs.push(function () {
@@ -2341,7 +2356,7 @@
     }
   }
 
-  function poll (
+  function poll(
     cb, // somehow flow cannot infer this is a function
     instances,
     key,
@@ -2377,6 +2392,7 @@
       var initLocation = getLocation(this.base);
       window.addEventListener('popstate', function (e) {
         var current = this$1.current;
+        console.log(this$1.base);
 
         // Avoiding first `popstate` event dispatched in some browsers but first
         // history route not updated since async guard at the same time.
@@ -2440,7 +2456,9 @@
   }(History));
 
   function getLocation (base) {
+    console.log('getLocation',base);
     var path = decodeURI(window.location.pathname);
+
     if (base && path.indexOf(base) === 0) {
       path = path.slice(base.length);
     }
@@ -2923,4 +2941,4 @@
 
   return VueRouter;
 
-}));
+})));
